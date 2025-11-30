@@ -11,7 +11,7 @@ class ConnectionManager:
         # Tracks which limited roles are currently occupied
         # The key is the role name (e.g., 'captain'), the value is the WebSocket instance
         self.active_roles: Dict[str, WebSocket] = {}
-        self.LIMITED_ROLES = ["captain", "specialist"]
+        self.LIMITED_ROLES = ["Captain", "Specialist"]
 
         # Lock to ensure thread-safe updates to shared state (important for async)
         self.lock = asyncio.Lock()
