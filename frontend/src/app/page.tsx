@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import VoyageSelector from "@/components/VoyageSelector"
 import MissionInput from "@/components/MissionInput"
 import ShopGrid from "@/components/ShopGrid"
-import { Rocket, Cpu } from "lucide-react"
 import CommandCenter from "@/components/CommandCentre"
+import { Rocket, Cpu, MessageSquare, ShoppingBag } from "lucide-react"
 
 interface ShopItem {
   name: string
@@ -24,13 +24,13 @@ interface SystemInfo {
 
 export default function Home() {
   const [selectedVoyage, setSelectedVoyage] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'inventory' | 'chat'>('inventory')
+  
   const [missionDescription, setMissionDescription] = useState("")
   const [shopItems, setShopItems] = useState<ShopItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
-  const [activeTab, setActiveTab] = useState<'inventory' | 'chat'>('inventory');
 
-  // Fetch system architecture info on component mount
   useEffect(() => {
     fetchSystemInfo()
   }, [])
@@ -71,15 +71,6 @@ export default function Home() {
       setShopItems(items)
     } catch (error) {
       console.error('Error generating inventory:', error)
-      // For demo purposes, we can add some fallback items here
-      setShopItems([
-        {
-          name: "Sample Item",
-          description: "This is a sample item. Please check your backend connection.",
-          price: 100,
-          category: "tools"
-        }
-      ])
     } finally {
       setIsLoading(false)
     }
@@ -104,7 +95,6 @@ export default function Home() {
                 <span className="text-gray-700 font-medium">
                   {systemInfo.architecture}
                 </span>
-                <span className="text-gray-500">•</span>
                 <span className="text-green-600 text-xs font-medium">
                   Powered by Arm64
                 </span>
@@ -113,123 +103,98 @@ export default function Home() {
           </div>
         </div>
       </header>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex justify-center gap-4">
-          <button
-            onClick={() => setActiveTab('inventory')}
-            className={`px-6 py-2 rounded-full font-medium transition-all ${
-              activeTab === 'inventory' 
-                ? 'bg-blue-600 text-white shadow-lg' 
-                : 'bg-white text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Inventory Generator
-          </button>
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`px-6 py-2 rounded-full font-medium transition-all ${
-              activeTab === 'chat' 
-                ? 'bg-blue-600 text-white shadow-lg' 
-                : 'bg-white text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Voyage Command Center (Multi-Agent)
-          </button>
-        </div>
-      </div>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Welcome Section */}
-        {activeTab === 'inventory' ? (
-            // ... EXISTING INVENTORY CODE ...
-            <div className="space-y-16">
-                <div className="space-y-16">
-                  {/* Step 1: Voyage Selection */}
+        {/* 1. Voyage Selection (Always Visible) */}
+        <section className="mb-16">
+          <div className="text-center mb-10">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Start Your Adventure
+            </h2>
+            <p className="text-xl text-gray-600">
+              Step 1: Select the type of world you are exploring
+            </p>
+          </div>
+          <VoyageSelector
+            selectedVoyage={selectedVoyage}
+            onVoyageSelect={(id) => {
+              setSelectedVoyage(id);
+              setShopItems([]); // Clear previous inventory if switching worlds
+            }}
+          />
+        </section>
+
+        {/* 2. Action Area (Only visible after selection) */}
+        {selectedVoyage && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            
+            {/* Tab Switcher */}
+            <div className="flex justify-center mb-12">
+              <div className="bg-white p-1.5 rounded-full shadow-lg border border-gray-200 flex gap-2">
+                <button
+                  onClick={() => setActiveTab('inventory')}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium transition-all duration-200 ${
+                    activeTab === 'inventory'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  Inventory Generator
+                </button>
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium transition-all duration-200 ${
+                    activeTab === 'chat'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Multi-Agent Command Center
+                </button>
+              </div>
+            </div>
+
+            {/* Content Area */}
+            {activeTab === 'inventory' ? (
+              <div className="space-y-16 max-w-4xl mx-auto">
+                <section className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                  <MissionInput
+                    missionDescription={missionDescription}
+                    onMissionChange={setMissionDescription}
+                    onGenerateInventory={generateInventory}
+                    isLoading={isLoading}
+                    disabled={isLoading}
+                  />
+                </section>
+
+                {(shopItems.length > 0 || isLoading) && (
                   <section>
-                    <div className="mb-8">
-                      <div className="flex items-center justify-center mb-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
-                            1
-                          </div>
-                          <span className="text-lg font-semibold text-gray-900">Choose Your Voyage Type</span>
-                        </div>
-                      </div>
-                    </div>
-                    <VoyageSelector
-                      selectedVoyage={selectedVoyage}
-                      onVoyageSelect={setSelectedVoyage}
+                    <ShopGrid
+                      items={shopItems}
+                      isLoading={isLoading}
                     />
                   </section>
-
-                  {/* Step 2: Mission Input */}
-                  {selectedVoyage && (
-                    <section>
-                      <div className="mb-8">
-                        <div className="flex items-center justify-center mb-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
-                              2
-                            </div>
-                            <span className="text-lg font-semibold text-gray-900">Describe Your Mission</span>
-                          </div>
-                        </div>
-                      </div>
-                      <MissionInput
-                        missionDescription={missionDescription}
-                        onMissionChange={setMissionDescription}
-                        onGenerateInventory={generateInventory}
-                        isLoading={isLoading}
-                        disabled={isLoading}
-                      />
-                    </section>
-                  )}
-
-                  {/* Step 3: Generated Inventory */}
-                  {(shopItems.length > 0 || isLoading) && (
-                    <section>
-                      <div className="mb-8">
-                        <div className="flex items-center justify-center mb-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
-                              3
-                            </div>
-                            <span className="text-lg font-semibold text-gray-900">Your Custom Inventory</span>
-                          </div>
-                        </div>
-                      </div>
-                      <ShopGrid
-                        items={shopItems}
-                        isLoading={isLoading}
-                      />
-                    </section>
-                  )}
-                </div>
-            </div>
-        ) : (
-            <div className="max-w-4xl mx-auto">
-                {!selectedVoyage ? (
-                    <div className="text-center py-20">
-                        <h3 className="text-xl text-gray-600">Please select a Voyage Type above to initialize the Command Center protocols.</h3>
-                    </div>
-                ) : (
-                    <CommandCenter voyageType={selectedVoyage} />
                 )}
-            </div>
+              </div>
+            ) : (
+              <div className="max-w-5xl mx-auto">
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900">Mission Command Center</h3>
+                  <p className="text-gray-600">Collaborate with AI agents to plan your {selectedVoyage} mission</p>
+                </div>
+                {/* We use the voyage type as a key to force the chat to reset if the user changes worlds */}
+                <CommandCenter 
+                    key={selectedVoyage} 
+                    voyageType={selectedVoyage} 
+                />
+              </div>
+            )}
+          </div>
         )}
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            AI-Powered Survival Gear Generator
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Select your voyage type and describe your mission to generate a custom inventory of survival items powered by artificial intelligence
-          </p>
-        </div>
-
       </main>
 
-      {/* Footer */}
       <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200 mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-between">
@@ -237,11 +202,9 @@ export default function Home() {
               <p className="font-medium">Voyage AI Outfitter</p>
               <p className="text-sm">Hackathon project • Next.js + FastAPI + Google Gemini</p>
             </div>
-
             {systemInfo && (
               <div className="text-right text-sm text-gray-500">
                 <p>Server Architecture: <span className="font-mono text-gray-700">{systemInfo.architecture}</span></p>
-                <p>System: <span className="font-mono text-gray-700">{systemInfo.system}</span></p>
               </div>
             )}
           </div>

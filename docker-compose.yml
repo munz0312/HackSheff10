@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    platform: linux/arm64
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # We pass the variables here so they exist during the 'npm run build' phase
+      args:
+        # Use EC2_PUBLIC_IP if set (for AWS), otherwise default to localhost (for testing)
+        - NEXT_PUBLIC_API_URL=http://${EC2_PUBLIC_IP:-localhost}:8000
+        - NEXT_PUBLIC_WS_URL=ws://${EC2_PUBLIC_IP:-localhost}:8000
+    platform: linux/arm64
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always
