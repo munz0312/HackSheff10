@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build: 
@@ -25,6 +23,8 @@ services:
     platform: linux/arm64
     ports:
       - "3000:3000"
+    environment:
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
     depends_on:
       - backend
     restart: always
