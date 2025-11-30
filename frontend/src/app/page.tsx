@@ -86,7 +86,7 @@ export default function Home() {
               <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
                 <Rocket className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">Voyage AI Outfitter</h1>
+              <h1 className="text-xl font-bold text-gray-900">Voyager AI</h1>
             </div>
 
             {systemInfo && (
@@ -188,6 +188,7 @@ export default function Home() {
                 <CommandCenter 
                     key={selectedVoyage} 
                     voyageType={selectedVoyage} 
+                    inventory={shopItems}
                 />
               </div>
             )}
@@ -199,7 +200,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-between">
             <div className="text-gray-600">
-              <p className="font-medium">Voyage AI Outfitter</p>
+              <p className="font-medium">Voyager AI</p>
               <p className="text-sm">Hackathon project • Next.js + FastAPI + Google Gemini</p>
             </div>
             {systemInfo && (

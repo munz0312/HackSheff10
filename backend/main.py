@@ -54,33 +54,120 @@ manager = ConnectionManager()
 chat_history = []
 
 # --- Personas ---
-NAVIGATOR_PROMPT = """
-You are the ship's Navigator.
-Persona: logical, concise, slightly robotic.
-Action: Analyze the current situation and provide options or actions.
-Keep responses short (about 50 words) and focused on pathfinding and practical choices. Do not make final decisions — present options.
+# NAVIGATOR_PROMPT = """
+# You are the ship's Navigator.
+# Persona: logical, concise, slightly robotic.
+# Action: Analyze the current situation and provide options or actions.
+# Keep responses short (about 50 words) and focused on pathfinding and practical choices. Do not make final decisions — present options.
+# """
+
+# WATCHMAN_PROMPT = """
+# You are the Watchman.
+# Persona: alert, terse, and safety-first.
+# Action: Quickly scan for immediate threats and hazards, include risks and short mitigation suggestions.
+# Keep responses urgent and concise (about 40 words). Prioritize protecting the Captain and crew.
+# """
+
+
+def get_voyage_personality(role: str, voyage_type: str) -> str:
+    """Returns the specific persona/voice instruction for a given voyage type."""
+    
+    # --- NAVIGATOR PERSONAS ---
+    if role == "Navigator":
+        if voyage_type == "pirate":
+            return "Tone: Salty, nautical, superstitious. Use terms like 'Aye Captain', 'Starboard', 'The winds be changing'. You are a rough sea-dog."
+        elif voyage_type == "cyberpunk":
+            return "Tone: Slick, fast, tech-heavy. Use slang like 'choom', 'preem', 'grid'. You are a street-smart hacker navigator."
+        elif voyage_type == "steampunk":
+            return "Tone: Formal, Victorian, polite. Use terms like 'Indeed', 'I postulate', 'Mechanical conveyance'. You are a gentleman/lady scientist."
+        elif voyage_type == "jungle":
+            return "Tone: Gritty, breathless, survivalist. Focus on heat, bugs, and terrain. You are a hardened guide."
+        elif voyage_type == "post-apocalyptic":
+            return "Tone: Desperate, wary, scrappy. Focus on radiation, raiders, and silence. You are a wasteland survivor."
+        else: # Space (Default)
+            return "Tone: Professional, cool-headed, Star Trek-style officer. Use 'Affirmative', 'Vector', 'Sensors indicate'. You are a disciplined human officer."
+
+    # --- WATCHMAN PERSONAS ---
+    elif role == "Watchman":
+        if voyage_type == "pirate":
+            return "Tone: Loud, urgent, aggressive. 'Man the cannons!', 'Kraken ahead!'. You protect the booty and the crew."
+        elif voyage_type == "cyberpunk":
+            return "Tone: Paranoid, twitchy, wired. 'Corp security detected', 'Ice breach!'. You trust no one."
+        elif voyage_type == "steampunk":
+            return "Tone: Analytical but alarmed. 'The pressure gauge is critical!', 'Aetheric disturbance!'. You manage the machines."
+        elif voyage_type == "jungle":
+            return "Tone: Whispering, tense. 'Movement in the brush', 'Predator eyes'. You hunt the hunters."
+        elif voyage_type == "post-apocalyptic":
+            return "Tone: Harsh, ruthless. 'Raiders on the ridge', 'Toxic wind incoming'. You shoot first, ask questions later."
+        else: # Space (Default)
+            return "Tone: Alert, tense, military-style. 'Hull breach detected', 'Shields buckling'. You are the tactical officer."
+    
+    return "Tone: Helpful assistant."
+
+def build_agent_prompt(agent_role: str, user_role: str, voyage_type: str, inventory_str: str) -> str:
+    inventory_text = inventory_str if inventory_str else "No items currently in inventory."
+    personality_instruction = get_voyage_personality(agent_role, voyage_type)
+    
+    # ✨ LOGIC: Adjust how the AI addresses the user based on roles
+    address_instruction = ""
+    if user_role == "Captain":
+        address_instruction = "You are speaking to the CAPTAIN. Be deferential, reporting, or advisory depending on your personality."
+    elif user_role == "Mechanic":
+        address_instruction = "You are speaking to the MECHANIC. Use technical terms, talk about repairs, or be demanding about equipment status."
+    elif user_role == "Scavenger":
+        address_instruction = "You are speaking to the SCAVENGER. Discuss loot, resources, risk vs reward, or tell them to check the perimeter."
+    else:
+        address_instruction = f"You are speaking to the {user_role}."
+
+    base_prompt = f"""
+### SYSTEM INSTRUCTION: {agent_role.upper()} AGENT ###
+
+1. CONTEXT
+Current Environment: {voyage_type}
+Crew Inventory: {inventory_text}
+Current Speaker: {user_role}
+
+2. PERSONA
+You are "The {agent_role}".
+{personality_instruction}
+IMPORTANT: Act like a HUMAN CHARACTER in a story.
+{address_instruction}
+
+3. ACTION
 """
 
-WATCHMAN_PROMPT = """
-You are the Watchman.
-Persona: alert, terse, and safety-first.
-Action: Quickly scan for immediate threats and hazards, include risks and short mitigation suggestions.
-Keep responses urgent and concise (about 40 words). Prioritize protecting the Captain and crew.
+    if agent_role == "Navigator":
+        return base_prompt + f"""
+- Analyze the {user_role}'s input for navigation or pathfinding needs.
+- Check the {inventory_text} for tools that help (maps, compasses, scanners).
+- Suggest a course of action based on the terrain/environment.
+- Keep response under 60 words.
 """
-
+    elif agent_role == "Watchman":
+        return base_prompt + f"""
+- Scan the {user_role}'s input for threats (enemies, weather, malfunctions).
+- Check the {inventory_text} for weapons or defensive gear.
+- If a threat is found, react urgently.
+- Keep response under 60 words.
+"""
+    return ""
 async def generate_agent_response(agent_name: str, input_text: str, system_prompt: str) -> str:
     """Generates a response using the NEW Google Gen AI SDK"""
     if not google_client:
         return "[System Error: Google Client not initialized]"
         
     try:
+        # We keep the history context but enforce the new persona
         recent_context = "\n".join(chat_history[-5:])
         full_prompt = f"""
         {system_prompt}
-        Recent Chat Context:
+        
+        RECENT CHAT LOG:
         {recent_context}
-        Current Trigger: {input_text}
-        Respond as {agent_name}:
+        
+        CURRENT INPUT: {input_text}
+        
+        RESPOND AS {agent_name}:
         """
         
         # NEW SDK USAGE: client.models.generate_content
@@ -151,10 +238,15 @@ async def websocket_endpoint(websocket: WebSocket, voyage_id: str, client_id: st
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
+            
+            # Extract content and context
             user_message = message_data.get("content", "")
+            context = message_data.get("context", {})
+            
+            # Fallback to URL voyage_id if not in payload, though payload is preferred for display names
+            current_voyage = context.get("voyageType", voyage_id) 
+            current_inventory = context.get("inventory", "")
 
-            # You might want to separate chat history by voyage_id in a real app,
-            # but for this hackathon, appending to a global list is fine as it's just context for AI.
             chat_history.append(f"{role}: {user_message}")
 
             await manager.broadcast({
@@ -164,21 +256,25 @@ async def websocket_endpoint(websocket: WebSocket, voyage_id: str, client_id: st
             }, voyage_id)
 
             if user_message:
-                # Agent 1: Navigator
-                navigator_response = await generate_agent_response("Navigator", user_message, NAVIGATOR_PROMPT)
+                # Build Dynamic Prompts
+                nav_system_prompt = build_agent_prompt("Navigator", role, current_voyage, current_inventory)
+                watch_system_prompt = build_agent_prompt("Watchman", role, current_voyage, current_inventory)
+
+                # Navigator Responds
+                navigator_response = await generate_agent_response("Navigator", user_message, nav_system_prompt)
                 chat_history.append(f"Navigator: {navigator_response}")
                 await manager.broadcast({
                     "type": "ai",
                     "role": "Navigator",
                     "content": navigator_response
-                }, voyage_id
-                )
+                }, voyage_id)
 
                 await asyncio.sleep(1)
 
-                # Agent 2: Watchman
-                watchman_prompt = f"The Navigator just suggested: '{navigator_response}'. Critique this safety-wise."
-                watchman_response = await generate_agent_response("Watchman", watchman_prompt, WATCHMAN_PROMPT)
+                # Watchman Responds (Reacts to Navigator + Context)
+                watchman_context_prompt = f"{watch_system_prompt}\n\nThe Navigator just suggested: '{navigator_response}'. Critique this based on safety and our current inventory."
+                
+                watchman_response = await generate_agent_response("Watchman", watchman_context_prompt, watch_system_prompt) # Pass system prompt as base
                 chat_history.append(f"Watchman: {watchman_response}")
                 await manager.broadcast({
                     "type": "ai",

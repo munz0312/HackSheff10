@@ -20,8 +20,16 @@ interface RoleStatus {
 
 interface QueueItem extends Message {}
 
+interface ShopItem {
+  name: string
+  description: string
+  price: number
+  category: string
+}
+
 interface CommandCenterProps {
   voyageType: string
+  inventory: ShopItem[]
 }
 
 const VOICES = {
@@ -29,7 +37,7 @@ const VOICES = {
   WATCHMAN: "ErXwobaYiN019PkySvjV",    // Antoni
 }
 
-export default function CommandCenter({ voyageType }: CommandCenterProps) {
+export default function CommandCenter({ voyageType, inventory }: CommandCenterProps) {
   const [socket, setSocket] = useState<WebSocket | null>(null)
   
   // Visible Messages (What the user sees)
@@ -187,7 +195,17 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputValue.trim() || !socket) return
-    socket.send(JSON.stringify({ content: inputValue }))
+
+    // Create a payload object with context
+    const payload = {
+      content: inputValue,
+      context: {
+        voyageType: voyageType,
+        inventory: inventory.map(item => item.name).join(", ") // Send names as a comma-separated string
+      }
+    }
+
+    socket.send(JSON.stringify(payload))
     setInputValue("")
   }
 
