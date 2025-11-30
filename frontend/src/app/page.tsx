@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import VoyageSelector from "@/components/VoyageSelector"
 import MissionInput from "@/components/MissionInput"
 import ShopGrid from "@/components/ShopGrid"
-import CommandCenter from "@/components/CommandCentre" // Ensure this is imported
+import CommandCenter from "@/components/CommandCentre"
 import { Rocket, Cpu, MessageSquare, ShoppingBag } from "lucide-react"
 
 interface ShopItem {
