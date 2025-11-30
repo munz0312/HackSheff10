@@ -196,7 +196,8 @@ async def websocket_endpoint(websocket: WebSocket, voyage_id: str, client_id: st
                     "type": "ai",
                     "role": "Navigator",
                     "content": navigator_response
-                })
+                }, voyage_id
+                )
 
                 await asyncio.sleep(1)
 
@@ -208,7 +209,7 @@ async def websocket_endpoint(websocket: WebSocket, voyage_id: str, client_id: st
                     "type": "ai",
                     "role": "Watchman",
                     "content": watchman_response
-                })
+                }, voyage_id)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket, voyage_id, role)
