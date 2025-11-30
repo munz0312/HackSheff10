@@ -138,8 +138,7 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
     const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws'
     const cleanUrl = wsBaseUrl.endsWith('/ws') ? wsBaseUrl : `${wsBaseUrl}/ws`
     
-    const ws = new WebSocket(`${cleanUrl}/${id_short}/${selectedRole}`)
-
+   const ws = new WebSocket(`${cleanUrl}/${voyageType}/${id_short}/${selectedRole}`)
     ws.onopen = () => {
       setIsConnected(true)
       console.log("Connected to Command Center")
@@ -341,7 +340,7 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={`Transmitting as ${role}...`}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+            className="flex-1 px-4 py-3 text-gray-900 bg-white placeholder-gray-500 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
           />
           <button 
             type="submit" 

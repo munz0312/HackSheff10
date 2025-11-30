@@ -151,28 +151,26 @@ async def generate_items_with_gemini(voyage_type: str, mission_description: str)
         return []
 
 # --- WebSocket Endpoint ---
-@app.websocket("/ws/{client_id}/{role}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str, role: str):
-
+@app.websocket("/ws/{voyage_id}/{client_id}/{role}")
+async def websocket_endpoint(websocket: WebSocket, voyage_id: str, client_id: str, role: str):
     try:
-        # 1. Connect (handles accept() and server-side role limit blocking)
-        await manager.connect(websocket, role)
+        # Pass voyage_id to connect
+        await manager.connect(websocket, voyage_id, role)
     except WebSocketDisconnect:
-        # If connect fails (due to role limit), the socket is already closed, just exit.
         return
 
-    # 2. Broadcast the successful connection message
+    # Broadcast to specific voyage
     await manager.broadcast({
         "type": "system",
         "content": f"{role.upper()} ({client_id[:8]}) has entered the command center."
-    })
+    }, voyage_id)
 
-    # 3. CRITICAL ADDITION: Broadcast the NEW role status after connection
-    role_status = await manager.get_role_status()
+    # Get status for specific voyage
+    role_status = await manager.get_role_status(voyage_id)
     await manager.broadcast({
         "type": "role_status",
         "data": role_status
-    })
+    }, voyage_id)
 
     try:
         while True:
@@ -180,13 +178,15 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, role: str):
             message_data = json.loads(data)
             user_message = message_data.get("content", "")
 
+            # You might want to separate chat history by voyage_id in a real app,
+            # but for this hackathon, appending to a global list is fine as it's just context for AI.
             chat_history.append(f"{role}: {user_message}")
 
             await manager.broadcast({
                 "type": "human",
                 "role": role,
                 "content": user_message
-            })
+            }, voyage_id)
 
             if user_message:
                 # Agent 1: Navigator
@@ -210,15 +210,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, role: str):
                     "content": watchman_response
                 })
 
-    except WebSocketDisconnect as e:
-        # CRITICAL CHANGE: Pass the 'role' to manager.disconnect
-        manager.disconnect(websocket, role)
-
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, voyage_id, role)
         await manager.broadcast({
             "type": "system",
             "content": f"{role.upper()} disconnected."
-        })
-
+        }, voyage_id)
 # --- Helper Functions (Image Generation) ---
 def generate_placeholder_image_url(item_name: str, voyage_type: str) -> str:
     seed = abs(hash(item_name + voyage_type)) % 1000
