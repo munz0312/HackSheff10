@@ -1,24 +1,19 @@
 "use client"
 
-<<<<<<< HEAD
 import { useState, useEffect, useRef } from "react"
-import { Send, User, Bot, ShieldAlert, Zap, Volume2 } from "lucide-react"
-=======
-import { useState, useEffect, useCallback, useRef } from "react"
-import { Users, AlertTriangle, Send } from "lucide-react"
+import { Send, User, Bot, ShieldAlert, Zap, Volume2, AlertTriangle } from "lucide-react"
 
-// Define the expected message structures
+interface Message {
+  type: "human" | "ai" | "system" | "role_status"
+  role?: string
+  content: string
+  timestamp: number
+  data?: RoleStatus
+}
+
 interface RoleStatus {
     captain: boolean
     specialist: boolean
-}
->>>>>>> d19f55c71777aaa2a0568a746815c7cc7878451c
-
-interface Message {
-    type: 'system' | 'human' | 'ai' | 'role_status'
-    content?: string // This is the source of the TS error: it's optional
-  role?: string
-    data?: RoleStatus
 }
 
 interface ChatMessage {
@@ -52,6 +47,11 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
   const [role, setRole] = useState<"Captain" | "Specialist" | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false) // Lock for the audio processor
+
+  const [clientId, setClientId] = useState<string | null>(null)
+  const [isCaptainOccupied, setIsCaptainOccupied] = useState(false)
+  const [isSpecialistOccupied, setIsSpecialistOccupied] = useState(false)
+  const [warning, setWarning] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -114,128 +114,49 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
     processNextMessage()
   }, [messageQueue, isProcessing])
 
+  const handleDisabledClick = (targetRole: string) => {
+    if ((targetRole === 'Captain' && isCaptainOccupied) || (targetRole === 'Specialist' && isSpecialistOccupied)) {
+        setWarning(`${targetRole} slot is currently occupied. Please wait or join as the other role.`)
+    }
+  }
+
   const joinSession = (selectedRole: "Captain" | "Specialist") => {
+
+    if (selectedRole === 'Captain' && isCaptainOccupied) {
+        handleDisabledClick('Captain');
+        return;
+    }
+    if (selectedRole === 'Specialist' && isSpecialistOccupied) {
+        handleDisabledClick('Specialist');
+        return;
+    }
+
     setRole(selectedRole)
-    const clientId = Math.floor(Math.random() * 1000).toString()
+    setWarning(null)
+
+    const id = crypto.randomUUID()
+    const id_short = id.slice(0, 8)
+    setClientId(id_short)
     
     const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws'
     const cleanUrl = wsBaseUrl.endsWith('/ws') ? wsBaseUrl : `${wsBaseUrl}/ws`
     
     const ws = new WebSocket(`${cleanUrl}/${clientId}/${selectedRole}`)
-=======
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const WS_URL = API_URL.replace('http', 'ws')
 
-export default function CommandCenter({ voyageType }: CommandCenterProps) {
-    const [role, setRole] = useState<'captain' | 'specialist' | null>(null)
-    const [clientId, setClientId] = useState<string | null>(null)
-    const [messages, setMessages] = useState<ChatMessage[]>([])
-    const [isCaptainOccupied, setIsCaptainOccupied] = useState(false)
-    const [isSpecialistOccupied, setIsSpecialistOccupied] = useState(false)
-    const [inputMessage, setInputMessage] = useState("")
-    const [warning, setWarning] = useState<string | null>(null)
-    const [isWsOpen, setIsWsOpen] = useState(false) // ✨ NEW STATE for WebSocket readiness
-
-    const wsRef = useRef<WebSocket | null>(null)
-    const messageEndRef = useRef<HTMLDivElement>(null)
-
-    const connectWebSocket = useCallback((targetRole: 'captain' | 'specialist') => {
-        if (wsRef.current) return
->>>>>>> d19f55c71777aaa2a0568a746815c7cc7878451c
-
-        const id = crypto.randomUUID()
-        const id_short = id.slice(0, 8)
-        setClientId(id_short)
-        setRole(targetRole)
-        setWarning(null)
-
-        const socket = new WebSocket(`${WS_URL}/ws/${id_short}/${targetRole}`)
-        wsRef.current = socket
-
-        socket.onopen = () => {
-            console.log(`WebSocket connected as ${targetRole}`)
-            setIsWsOpen(true) // ✨ Set state to open
-            setMessages(prev => [...prev, {
-                id: Date.now(),
-                role: 'system',
-                source: 'System',
-                content: `Successfully connected as ${targetRole.toUpperCase()}. ID: ${id_short}`
-            }])
-        }
-
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data) as Message
-
-            if (data.type === 'role_status' && data.data) {
-                // CRITICAL: Update button status based on backend broadcast
-                setIsCaptainOccupied(data.data.captain)
-                setIsSpecialistOccupied(data.data.specialist) //
-            } else if (data.content) {
-                // Handle chat messages
-                const source = data.role === 'captain' || data.role === 'specialist' ? data.role.toUpperCase() : data.role || 'System'
-
-                // FIX: Use non-null assertion (!) because the 'if (data.content)' guarantees its presence.
-                setMessages(prev => [...prev, {
-                    id: Date.now(),
-                    role: data.type as 'system' | 'human' | 'ai',
-                    source: source,
-                    content: data.content! // <-- TS Error Fix applied here
-                }])
-            }
-        }
-
-        socket.onclose = (event) => {
-            console.log(`WebSocket closed: ${event.code}. Reason: ${event.reason}`)
-            wsRef.current = null
-            setRole(null)
-            setIsWsOpen(false) // ✨ Set state to closed
-
-            if (event.code === 4000) {
-                // CRITICAL: Handle the custom close code for role rejection
-                const reason = event.reason || "This role is already occupied."
-                setWarning(`Connection Failed: ${reason}`) //
-            } else if (event.code !== 1000) {
-                setMessages(prev => [...prev, {
-                    id: Date.now(),
-                    role: 'system',
-                    source: 'System',
-                    content: `Connection lost (${event.code}). Please try reconnecting.`
-                }])
-            }
-        }
-
-        socket.onerror = (error) => {
-            console.error("WebSocket error:", error)
-            setWarning("WebSocket connection error. Check API key and server status.")
-        }
-
-    }, [])
-
-    // Clean up WebSocket on component unmount
-    useEffect(() => {
-        return () => {
-            if (wsRef.current) {
-                wsRef.current.close(1000, "Component Unmount")
-    }
-        }
-    }, [connectWebSocket])
-
-    // Scroll to the bottom of the chat box when a new message arrives
-    useEffect(() => {
-        messageEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, [messages])
-
-    // Handle button clicks when a role is occupied (displays warning)
-    const handleDisabledClick = (targetRole: string) => {
-        if ((targetRole === 'captain' && isCaptainOccupied) || (targetRole === 'specialist' && isSpecialistOccupied)) {
-            setWarning(`${targetRole.charAt(0).toUpperCase() + targetRole.slice(1)} slot is currently occupied. Please wait or join as the other role.`)
-        }
+    ws.onopen = () => {
+      setIsConnected(true)
+      console.log("Connected to Command Center")
     }
 
-<<<<<<< HEAD
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
       const newMsg = { ...data, timestamp: Date.now() }
+      if (data.type === 'role_status' && data.data) {
+          setIsCaptainOccupied(data.data.captain)
+          setIsSpecialistOccupied(data.data.specialist)
+          return; // Don't process this as a chat message
+      }
+      
       if (data.type === "ai") {
         // If it's AI, put it in the HIDDEN queue. 
         // The useEffect above will handle revealing it.
@@ -244,31 +165,28 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
         // If it's Human or System, show it IMMEDIATELY.
         setMessages((prev) => [...prev, newMsg])
       }
-=======
-    // Send message logic
-    const sendMessage = (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !inputMessage.trim() || !role) {
-            return
-        }
-
-        const messagePayload = {
-            content: inputMessage.trim(),
-            role: role,
-        }
-
-        wsRef.current.send(JSON.stringify(messagePayload))
-        setInputMessage("")
->>>>>>> d19f55c71777aaa2a0568a746815c7cc7878451c
     }
 
-    if (!role) {
-        return (
-            <div className="text-center bg-white p-8 rounded-xl shadow-lg border border-gray-100">
-                <h3 className="text-2xl font-semibold text-gray-800 mb-4">Join Command Center</h3>
-                <p className="text-gray-600 mb-6">Select your role for the **{voyageType}** voyage.</p>
+    ws.onclose = (event) => {
+        setIsConnected(false)
+        setRole(null) // Reset role on disconnect
+        
+        // ✨ MERGED: Handle specific backend rejection codes
+        if (event.code === 4000) {
+            const reason = event.reason || "This role is already occupied."
+            setWarning(`Connection Failed: ${reason}`)
+        } else {
+            console.log("Disconnected")
+        }
+    }
 
-<<<<<<< HEAD
+    ws.onerror = (error) => {
+        console.error("WebSocket error:", error)
+        setWarning("Connection error. Check server status.")
+    }
+    setSocket(ws)
+  }
+
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputValue.trim() || !socket) return
@@ -281,20 +199,37 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
       <div className="bg-white rounded-xl p-8 shadow-xl max-w-2xl mx-auto text-center border border-gray-100">
         <h2 className="text-2xl font-bold mb-2 text-gray-900">Enter Voyage Command Center</h2>
         <p className="mb-8 text-gray-600">To enable multi-agent collaboration, please select your role in the squad.</p>
+        {warning && (
+            <div className="flex items-center justify-center p-3 mb-6 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200">
+                <AlertTriangle className="w-5 h-5 mr-2" />
+                {warning}
+            </div>
+        )}
         <div className="flex gap-4 justify-center">
           <button 
             onClick={() => joinSession("Captain")}
-            className="flex flex-col items-center gap-3 p-6 border-2 border-blue-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all w-48 group"
+            disabled={isCaptainOccupied}
+            className={`flex flex-col items-center gap-3 p-6 border-2 border-blue-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all w-48 group${
+                isCaptainOccupied 
+                ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60' 
+                : 'border-blue-100 hover:border-blue-500 hover:bg-blue-50'
+            }`}
           >
             <div className="p-4 bg-blue-100 rounded-full text-blue-600 group-hover:scale-110 transition-transform"><User size={32} /></div>
-            <span className="font-bold text-lg text-gray-800">Captain</span>
+            <span className="font-bold text-lg text-gray-800">Captain {isCaptainOccupied && <span className="block text-xs text-red-500 mt-1">(Occupied)</span>}</span>
           </button>
           <button 
             onClick={() => joinSession("Specialist")}
-            className="flex flex-col items-center gap-3 p-6 border-2 border-purple-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all w-48 group"
+            className={`flex flex-col items-center gap-3 p-6 border-2 border-purple-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all w-48 group ${
+                isSpecialistOccupied 
+                ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60' 
+                : 'border-purple-100 hover:border-purple-500 hover:bg-purple-50'
+            }`}
           >
             <div className="p-4 bg-purple-100 rounded-full text-purple-600 group-hover:scale-110 transition-transform"><Zap size={32} /></div>
-            <span className="font-bold text-lg text-gray-800">Specialist</span>
+            <span className="font-bold text-lg text-gray-800">Specialist
+                {isSpecialistOccupied && <span className="block text-xs text-red-500 mt-1">(Occupied)</span>}
+            </span>
           </button>
         </div>
       </div>
@@ -320,7 +255,7 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
             </div>
           )}
           <div className="text-xs bg-gray-800 px-3 py-1.5 rounded-full border border-gray-700">
-            ID: <span className="text-blue-400 font-bold">{role}</span>
+            ID: <span className="text-blue-400 font-bold">{role} ({clientId})</span>
           </div>
         </div>
       </div>
