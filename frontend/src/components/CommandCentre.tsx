@@ -85,13 +85,13 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
 
           // Audio is ready. Reveal text and play audio.
           setMessages((prev) => [...prev, nextMsg])
+          setMessageQueue((prev) => prev.slice(1))
           
           await audio.play()
 
           // When audio finishes, unlock processor and remove item from queue
           audio.onended = () => {
             setIsProcessing(false)
-            setMessageQueue((prev) => prev.slice(1)) // Remove the item we just played
             URL.revokeObjectURL(url)
           }
         } else {
