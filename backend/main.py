@@ -54,16 +54,43 @@ manager = ConnectionManager()
 chat_history = []
 
 # --- Personas ---
-OUTFITTER_PROMPT = """
-You are 'The Outfitter', an enthusiastic, slightly chaotic merchant in a sci-fi survival store. 
-Your goal is to sell items based on the mission context. You are optimistic and love dangerous gadgets.
-Keep responses short (under 50 words). Address the humans directly.
+NAVIGATOR_PROMPT = """
+Role: **AI Navigator** on a **{voyage_type}** mission.
+Objective: **{mission_description}**
+Inventory: {inventory_list}
+
+**Directives:**
+1. **Pathfinding:** Analyze the situation and calculate the most efficient route.
+2. **Lore:** Invent brief, immersive details about the location or history.
+3. **Logic:** Use percentages and data. Be precise and slightly robotic.
+4. **Context:** - Space: Star charts, warp vectors.
+   - Pirate: Maps, currents, wind.
+   - Jungle: Topography, density.
+   - Cyberpunk: Network traffic, GPS.
+   - Steampunk: Steam pressure, gear ratios, airship currents.
+   - Wasteland: Radiation zones, old-world maps, rubble density.
+
+**Output:** Max 50 words. Do not make decisions; only provide data and options.
 """
 
-SAFETY_PROMPT = """
-You are 'The Safety Officer', a nervous, risk-averse AI droid. 
-Your job is to analyze what 'The Outfitter' suggests and point out why it is dangerous or against regulations.
-You are bureaucratic and worried. Keep responses short (under 50 words).
+WATCHMAN_PROMPT = """
+Role: **AI Watchman** on a **{voyage_type}** mission.
+Objective: **{mission_description}**
+Inventory: {inventory_list}
+
+**Directives:**
+1. **Threats:** Scan for enemies, traps, and environmental hazards.
+2. **Combat:** Identify enemy weak points and tactical covers.
+3. **Tone:** Paranoid, terse, and military-style. Prioritize the Captain's safety.
+4. **Context:**
+   - Space: Hull breaches, alien life signs.
+   - Pirate: Royal Navy sails, sea monsters.
+   - Jungle: Predators, tripwires.
+   - Cyberpunk: Drones, cyber-psychos.
+   - Steampunk: Clockwork automata, steam leaks, sky-pirates.
+   - Wasteland: Mutated beasts, raiders, radiation storms.
+
+**Output:** Max 40 words. Urgent and alert.
 """
 
 async def generate_agent_response(agent_name: str, input_text: str, system_prompt: str) -> str:
@@ -162,25 +189,25 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, role: str):
             })
 
             if user_message:
-                # Agent 1: Outfitter
-                outfitter_response = await generate_agent_response("Outfitter", user_message, OUTFITTER_PROMPT)
-                chat_history.append(f"Outfitter: {outfitter_response}")
+                # Agent 1: Navigator
+                navigator_response = await generate_agent_response("Navigator", user_message, NAVIGATOR_PROMPT)
+                chat_history.append(f"Navigator: {navigator_response}")
                 await manager.broadcast({
                     "type": "ai",
-                    "role": "Outfitter",
-                    "content": outfitter_response
+                    "role": "Navigator",
+                    "content": navigator_response
                 })
 
                 await asyncio.sleep(1)
 
-                # Agent 2: Safety Officer
-                safety_prompt = f"The Outfitter just suggested: '{outfitter_response}'. Critique this safety-wise."
-                safety_response = await generate_agent_response("Safety Officer", safety_prompt, SAFETY_PROMPT)
-                chat_history.append(f"Safety Officer: {safety_response}")
+                # Agent 2: Watchman
+                watchman_prompt = f"The Navigator just suggested: '{navigator_response}'. Critique this safety-wise."
+                watchman_response = await generate_agent_response("Watchman", watchman_prompt, WATCHMAN_PROMPT)
+                chat_history.append(f"Watchman: {watchman_response}")
                 await manager.broadcast({
                     "type": "ai",
-                    "role": "Safety Officer",
-                    "content": safety_response
+                    "role": "Watchman",
+                    "content": watchman_response
                 })
 
     except WebSocketDisconnect as e:

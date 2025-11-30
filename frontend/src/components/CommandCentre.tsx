@@ -13,15 +13,10 @@ interface Message {
 
 interface RoleStatus {
     captain: boolean
-    specialist: boolean
+    scavenger: boolean
+    mechanic: boolean
 }
 
-interface ChatMessage {
-    id: number
-    role: 'system' | 'human' | 'ai'
-    source: string
-    content: string // This must be a required string
-}
 
 interface QueueItem extends Message {}
 
@@ -30,8 +25,8 @@ interface CommandCenterProps {
 }
 
 const VOICES = {
-  OUTFITTER: "21m00Tcm4TlvDq8ikWAM", // Rachel
-  SAFETY: "ErXwobaYiN019PkySvjV",    // Antoni
+  NAVIGATOR: "21m00Tcm4TlvDq8ikWAM", // Rachel
+  WATCHMAN: "ErXwobaYiN019PkySvjV",    // Antoni
 }
 
 export default function CommandCenter({ voyageType }: CommandCenterProps) {
@@ -44,13 +39,14 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
   const [messageQueue, setMessageQueue] = useState<QueueItem[]>([])
   
   const [inputValue, setInputValue] = useState("")
-  const [role, setRole] = useState<"Captain" | "Specialist" | null>(null)
+  const [role, setRole] = useState<"Captain" | "Scavenger" | "Mechanic" | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false) // Lock for the audio processor
 
   const [clientId, setClientId] = useState<string | null>(null)
   const [isCaptainOccupied, setIsCaptainOccupied] = useState(false)
-  const [isSpecialistOccupied, setIsSpecialistOccupied] = useState(false)
+  const [isScavengerOccupied, setIsScavengerOccupied] = useState(false)
+  const [isMechanicOccupied, setIsMechanicOccupied] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -69,7 +65,7 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
       const nextMsg = messageQueue[0] // Peek at the next message
 
       try {
-        const voiceId = nextMsg.role === "Outfitter" ? VOICES.OUTFITTER : VOICES.SAFETY
+        const voiceId = nextMsg.role === "Navigator" ? VOICES.NAVIGATOR : VOICES.WATCHMAN
         
         // Fetch Audio (Text is still hidden)
         const response = await fetch('/api/speak', {
@@ -115,33 +111,34 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
   }, [messageQueue, isProcessing])
 
   const handleDisabledClick = (targetRole: string) => {
-    if ((targetRole === 'Captain' && isCaptainOccupied) || (targetRole === 'Specialist' && isSpecialistOccupied)) {
         setWarning(`${targetRole} slot is currently occupied. Please wait or join as the other role.`)
-    }
+
   }
 
-  const joinSession = (selectedRole: "Captain" | "Specialist") => {
-
-    if (selectedRole === 'Captain' && isCaptainOccupied) {
-        handleDisabledClick('Captain');
-        return;
-    }
-    if (selectedRole === 'Specialist' && isSpecialistOccupied) {
-        handleDisabledClick('Specialist');
-        return;
-    }
+  const joinSession = (selectedRole: "Captain" | "Scavenger" | "Mechanic") => {
+      if (selectedRole === 'Captain' && isCaptainOccupied) {
+          handleDisabledClick('Captain');
+          return;
+      }
+      if (selectedRole === 'Scavenger' && isScavengerOccupied) {
+          handleDisabledClick('Scavenger');
+          return;
+      }
+      if (selectedRole === 'Mechanic' && isMechanicOccupied) {
+          handleDisabledClick('Mechanic');
+          return
+      }
 
     setRole(selectedRole)
     setWarning(null)
 
-    const id = crypto.randomUUID()
-    const id_short = id.slice(0, 8)
+    const id_short = Math.random().toString(36).substring(2, 10)
     setClientId(id_short)
     
     const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws'
     const cleanUrl = wsBaseUrl.endsWith('/ws') ? wsBaseUrl : `${wsBaseUrl}/ws`
     
-    const ws = new WebSocket(`${cleanUrl}/${clientId}/${selectedRole}`)
+    const ws = new WebSocket(`${cleanUrl}/${id_short}/${selectedRole}`)
 
     ws.onopen = () => {
       setIsConnected(true)
@@ -153,7 +150,8 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
       const newMsg = { ...data, timestamp: Date.now() }
       if (data.type === 'role_status' && data.data) {
           setIsCaptainOccupied(data.data.captain)
-          setIsSpecialistOccupied(data.data.specialist)
+          setIsScavengerOccupied(data.data.scavenger)
+          setIsMechanicOccupied(data.data.mechanic)
           return; // Don't process this as a chat message
       }
       
@@ -219,17 +217,30 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
             <span className="font-bold text-lg text-gray-800">Captain {isCaptainOccupied && <span className="block text-xs text-red-500 mt-1">(Occupied)</span>}</span>
           </button>
           <button 
-            onClick={() => joinSession("Specialist")}
+            onClick={() => joinSession("Scavenger")}
             className={`flex flex-col items-center gap-3 p-6 border-2 border-purple-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all w-48 group ${
-                isSpecialistOccupied 
+                isScavengerOccupied 
                 ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60' 
                 : 'border-purple-100 hover:border-purple-500 hover:bg-purple-50'
             }`}
           >
             <div className="p-4 bg-purple-100 rounded-full text-purple-600 group-hover:scale-110 transition-transform"><Zap size={32} /></div>
-            <span className="font-bold text-lg text-gray-800">Specialist
-                {isSpecialistOccupied && <span className="block text-xs text-red-500 mt-1">(Occupied)</span>}
+            <span className="font-bold text-lg text-gray-800">Scavenger
+                {isScavengerOccupied && <span className="block text-xs text-red-500 mt-1">(Occupied)</span>}
             </span>
+          </button>
+            <button
+              onClick={() => joinSession("Mechanic")}
+              className={`flex flex-col items-center gap-3 p-6 border-2 border-green-100 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all w-48 group ${
+                  isMechanicOccupied
+                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                      : 'border-green-100 hover:border-green-500 hover:bg-green-50'
+              }`}
+            >
+              <div className="p-4 bg-green-100 rounded-full text-green-600 group-hover:scale-110 transition-transform"><Zap size={32} /></div>
+              <span className="font-bold text-lg text-gray-800">Mechanic
+                  {isMechanicOccupied && <span className="block text-xs text-red-500 mt-1">(Occupied)</span>}
+              </span>
           </button>
         </div>
       </div>
