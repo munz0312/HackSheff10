@@ -134,8 +134,7 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
     setRole(selectedRole)
     setWarning(null)
 
-    const id = crypto.randomUUID()
-    const id_short = id.slice(0, 8)
+    const id_short = Math.random().toString(36).substring(2, 10)
     setClientId(id_short)
     
     const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws'
