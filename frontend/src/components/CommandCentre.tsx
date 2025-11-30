@@ -1,13 +1,31 @@
 "use client"
 
+<<<<<<< HEAD
 import { useState, useEffect, useRef } from "react"
 import { Send, User, Bot, ShieldAlert, Zap, Volume2 } from "lucide-react"
+=======
+import { useState, useEffect, useCallback, useRef } from "react"
+import { Users, AlertTriangle, Send } from "lucide-react"
+
+// Define the expected message structures
+interface RoleStatus {
+    captain: boolean
+    specialist: boolean
+}
+>>>>>>> d19f55c71777aaa2a0568a746815c7cc7878451c
 
 interface Message {
-  type: "human" | "ai" | "system"
+    type: 'system' | 'human' | 'ai' | 'role_status'
+    content?: string // This is the source of the TS error: it's optional
   role?: string
-  content: string
-  timestamp: number
+    data?: RoleStatus
+}
+
+interface ChatMessage {
+    id: number
+    role: 'system' | 'human' | 'ai'
+    source: string
+    content: string // This must be a required string
 }
 
 interface QueueItem extends Message {}
@@ -104,12 +122,117 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
     const cleanUrl = wsBaseUrl.endsWith('/ws') ? wsBaseUrl : `${wsBaseUrl}/ws`
     
     const ws = new WebSocket(`${cleanUrl}/${clientId}/${selectedRole}`)
+=======
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const WS_URL = API_URL.replace('http', 'ws')
 
-    ws.onopen = () => {
-      setIsConnected(true)
-      console.log("Connected to Command Center")
+export default function CommandCenter({ voyageType }: CommandCenterProps) {
+    const [role, setRole] = useState<'captain' | 'specialist' | null>(null)
+    const [clientId, setClientId] = useState<string | null>(null)
+    const [messages, setMessages] = useState<ChatMessage[]>([])
+    const [isCaptainOccupied, setIsCaptainOccupied] = useState(false)
+    const [isSpecialistOccupied, setIsSpecialistOccupied] = useState(false)
+    const [inputMessage, setInputMessage] = useState("")
+    const [warning, setWarning] = useState<string | null>(null)
+    const [isWsOpen, setIsWsOpen] = useState(false) // ✨ NEW STATE for WebSocket readiness
+
+    const wsRef = useRef<WebSocket | null>(null)
+    const messageEndRef = useRef<HTMLDivElement>(null)
+
+    const connectWebSocket = useCallback((targetRole: 'captain' | 'specialist') => {
+        if (wsRef.current) return
+>>>>>>> d19f55c71777aaa2a0568a746815c7cc7878451c
+
+        const id = crypto.randomUUID()
+        const id_short = id.slice(0, 8)
+        setClientId(id_short)
+        setRole(targetRole)
+        setWarning(null)
+
+        const socket = new WebSocket(`${WS_URL}/ws/${id_short}/${targetRole}`)
+        wsRef.current = socket
+
+        socket.onopen = () => {
+            console.log(`WebSocket connected as ${targetRole}`)
+            setIsWsOpen(true) // ✨ Set state to open
+            setMessages(prev => [...prev, {
+                id: Date.now(),
+                role: 'system',
+                source: 'System',
+                content: `Successfully connected as ${targetRole.toUpperCase()}. ID: ${id_short}`
+            }])
+        }
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data) as Message
+
+            if (data.type === 'role_status' && data.data) {
+                // CRITICAL: Update button status based on backend broadcast
+                setIsCaptainOccupied(data.data.captain)
+                setIsSpecialistOccupied(data.data.specialist) //
+            } else if (data.content) {
+                // Handle chat messages
+                const source = data.role === 'captain' || data.role === 'specialist' ? data.role.toUpperCase() : data.role || 'System'
+
+                // FIX: Use non-null assertion (!) because the 'if (data.content)' guarantees its presence.
+                setMessages(prev => [...prev, {
+                    id: Date.now(),
+                    role: data.type as 'system' | 'human' | 'ai',
+                    source: source,
+                    content: data.content! // <-- TS Error Fix applied here
+                }])
+            }
+        }
+
+        socket.onclose = (event) => {
+            console.log(`WebSocket closed: ${event.code}. Reason: ${event.reason}`)
+            wsRef.current = null
+            setRole(null)
+            setIsWsOpen(false) // ✨ Set state to closed
+
+            if (event.code === 4000) {
+                // CRITICAL: Handle the custom close code for role rejection
+                const reason = event.reason || "This role is already occupied."
+                setWarning(`Connection Failed: ${reason}`) //
+            } else if (event.code !== 1000) {
+                setMessages(prev => [...prev, {
+                    id: Date.now(),
+                    role: 'system',
+                    source: 'System',
+                    content: `Connection lost (${event.code}). Please try reconnecting.`
+                }])
+            }
+        }
+
+        socket.onerror = (error) => {
+            console.error("WebSocket error:", error)
+            setWarning("WebSocket connection error. Check API key and server status.")
+        }
+
+    }, [])
+
+    // Clean up WebSocket on component unmount
+    useEffect(() => {
+        return () => {
+            if (wsRef.current) {
+                wsRef.current.close(1000, "Component Unmount")
+    }
+        }
+    }, [connectWebSocket])
+
+    // Scroll to the bottom of the chat box when a new message arrives
+    useEffect(() => {
+        messageEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }, [messages])
+
+    // Handle button clicks when a role is occupied (displays warning)
+    const handleDisabledClick = (targetRole: string) => {
+        if ((targetRole === 'captain' && isCaptainOccupied) || (targetRole === 'specialist' && isSpecialistOccupied)) {
+            setWarning(`${targetRole.charAt(0).toUpperCase() + targetRole.slice(1)} slot is currently occupied. Please wait or join as the other role.`)
+        }
     }
 
+<<<<<<< HEAD
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
       const newMsg = { ...data, timestamp: Date.now() }
@@ -121,12 +244,31 @@ export default function CommandCenter({ voyageType }: CommandCenterProps) {
         // If it's Human or System, show it IMMEDIATELY.
         setMessages((prev) => [...prev, newMsg])
       }
+=======
+    // Send message logic
+    const sendMessage = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !inputMessage.trim() || !role) {
+            return
+        }
+
+        const messagePayload = {
+            content: inputMessage.trim(),
+            role: role,
+        }
+
+        wsRef.current.send(JSON.stringify(messagePayload))
+        setInputMessage("")
+>>>>>>> d19f55c71777aaa2a0568a746815c7cc7878451c
     }
 
-    ws.onclose = () => setIsConnected(false)
-    setSocket(ws)
-  }
+    if (!role) {
+        return (
+            <div className="text-center bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <h3 className="text-2xl font-semibold text-gray-800 mb-4">Join Command Center</h3>
+                <p className="text-gray-600 mb-6">Select your role for the **{voyageType}** voyage.</p>
 
+<<<<<<< HEAD
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputValue.trim() || !socket) return

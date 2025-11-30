@@ -126,10 +126,25 @@ async def generate_items_with_gemini(voyage_type: str, mission_description: str)
 # --- WebSocket Endpoint ---
 @app.websocket("/ws/{client_id}/{role}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str, role: str):
-    await manager.connect(websocket, role)
+
+    try:
+        # 1. Connect (handles accept() and server-side role limit blocking)
+        await manager.connect(websocket, role)
+    except WebSocketDisconnect:
+        # If connect fails (due to role limit), the socket is already closed, just exit.
+        return
+
+    # 2. Broadcast the successful connection message
     await manager.broadcast({
-        "type": "system", 
-        "content": f"{role} ({client_id}) has entered the command center."
+        "type": "system",
+        "content": f"{role.upper()} ({client_id[:8]}) has entered the command center."
+    })
+
+    # 3. CRITICAL ADDITION: Broadcast the NEW role status after connection
+    role_status = await manager.get_role_status()
+    await manager.broadcast({
+        "type": "role_status",
+        "data": role_status
     })
 
     try:
@@ -137,9 +152,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, role: str):
             data = await websocket.receive_text()
             message_data = json.loads(data)
             user_message = message_data.get("content", "")
-            
+
             chat_history.append(f"{role}: {user_message}")
-            
+
             await manager.broadcast({
                 "type": "human",
                 "role": role,
@@ -167,12 +182,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, role: str):
                     "role": "Safety Officer",
                     "content": safety_response
                 })
-            
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+
+    except WebSocketDisconnect as e:
+        # CRITICAL CHANGE: Pass the 'role' to manager.disconnect
+        manager.disconnect(websocket, role)
+
         await manager.broadcast({
             "type": "system",
-            "content": f"{role} disconnected."
+            "content": f"{role.upper()} disconnected."
         })
 
 # --- Helper Functions (Image Generation) ---
